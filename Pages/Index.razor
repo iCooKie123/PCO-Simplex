@@ -19,9 +19,9 @@
         <p>f=</p>
         @for (int i = 0; i < functionValues?.Length; i++)
         {
-            int row = i;
-            int value = functionValues[i]; // Temporary variable
-            <input type="number" @bind="value" @oninput="(e) => CustomFunction2(e, row, value)" />
+            double row = i;
+            double value = functionValues[i]; // Temporary variable
+            <input type="number" @bind="value" @oninput="(e) => CustomFunction2(e, (int)row, value)" />
             <p>x @i</p>
             @if (i != functionValues?.Length - 1)
             {
@@ -38,10 +38,10 @@
                     <tr>
                         @for (int j = 0; j < variabile; j++)
                         {
-                            int row = i; // Create a local copy of i
-                            int column = j; // Create a local copy of j
+                            double row = i; // Create a local copy of i
+                            double column = j; // Create a local copy of j
                             <td>
-                                <input type="number" value="@matrix[row][column]" @oninput="(e) => CustomFunction(e, row, column)" />
+                                <input type="number" value="@matrix[(int)row][(int)column]" @oninput="(e) => CustomFunction(e, (int)row, (int)column)" />
                             </td>
                             <td><p>x @j</p></td>
                             @if (j != variabile - 1)
@@ -74,32 +74,32 @@
     string SelectedMode = "max";
     private bool tabelVisible = false;
 
-    private int[][] matrix;
-    private int[] functionValues;
-    private int[] restrictionValues;
+    private double[][] matrix;
+    private double[] functionValues;
+    private double[] restrictionValues;
 
     private void genereazaTabel()
     {
         if (tabelVisible) tabelVisible = false;
         StateHasChanged();
 
-        matrix = new int[restrictii][];
+        matrix = new double[restrictii][];
         for (int i = 0; i < restrictii; i++)
         {
-            matrix[i] = new int[variabile];
+            matrix[i] = new double[variabile];
             for (int j = 0; j < variabile; j++)
             {
                 matrix[i][j] = 0;
             }
         }
 
-        functionValues = new int[variabile];
+        functionValues = new double[variabile];
         for (int i = 0; i < variabile; i++)
         {
             functionValues[i] = 0;
         }
 
-        restrictionValues = new int[restrictii];
+        restrictionValues = new double[restrictii];
         for (int i = 0; i < restrictii; i++)
         {
             restrictionValues[i] = 0;
@@ -111,7 +111,8 @@
 
     private void OnCheckButtonClicked()
     {
-        Console.WriteLine("hello world");
+        SimplexSolver solver = new SimplexSolver(matrix, functionValues, restrictionValues, SelectedMode == "max");
+        solver.Solve();
     }
 
     private void CustomFunction(ChangeEventArgs e, int i, int j)
@@ -121,16 +122,16 @@
         {
             matrix[i][j] = value;
         }
-        Console.WriteLine($"value: {value}, i = {i}, j = {j}");
+
     }
 
-    private void CustomFunction2(ChangeEventArgs e, int row, int value)
+    private void CustomFunction2(ChangeEventArgs e, int row, double value)
     {
-        if (int.TryParse(e.Value.ToString(), out int newValue))
+        if (double.TryParse(e.Value.ToString(), out double newValue))
         {
             value = newValue; // Update the temporary variable with the modified value
         }
-        Console.WriteLine($"value: {value}, row = {row}");
+
         functionValues[row] = value; // Update the array with the modified value
     }
 
@@ -141,9 +142,242 @@
         {
             restrictionValues[i] = value; // Update the array with the modified value
         }
-        Console.WriteLine($"value: {value}, i = {i}");
+
     }
 
-    
+    public class SimplexSolver
+    {
+        private double[][] matrix;
+        private double[] functionValues;
+        private double[] restrictionValues;
+        private bool maximize;
+
+        public SimplexSolver(int[][] matrix, int[] functionValues, int[] restrictionValues, bool maximize)
+        {
+            int numVariables = matrix[0].Length;
+            int numRestrictions = matrix.Length;
+            int tableauSize = numVariables + numRestrictions;
+
+            // Create a new matrix with the correct size and initialize it
+            this.matrix = new double[numRestrictions + 1][];
+            for (int i = 0; i <= numRestrictions; i++)
+            {
+                this.matrix[i] = new double[tableauSize];
+                for (int j = 0; j < tableauSize; j++)
+                {
+                    this.matrix[i][j] = 0;
+                }
+            }
+
+            // Copy the values from the original matrix to the new matrix
+            for (int i = 0; i < numRestrictions; i++)
+            {
+                for (int j = 0; j < numVariables; j++)
+                {
+                    this.matrix[i][j] = matrix[i][j];
+                }
+                this.matrix[i][numVariables + i] = 1; // Set the identity matrix
+                this.matrix[i][tableauSize - 1] = restrictionValues[i]; // Set the restriction values
+            }
+
+            // Copy the function values to the new matrix
+            for (int j = 0; j < numVariables; j++)
+            {
+                this.matrix[numRestrictions][j] = functionValues[j];
+            }
+
+            this.functionValues = new double[tableauSize];
+            for (int j = 0; j < tableauSize; j++)
+            {
+                this.functionValues[j] = 0;
+            }
+            this.functionValues[tableauSize - 1] = maximize ? 1 : -1;
+
+            this.restrictionValues = new double[numRestrictions];
+            for (int i = 0; i < numRestrictions; i++)
+            {
+                this.restrictionValues[i] = 0;
+            }
+
+            this.maximize = maximize;
+        }
+
+        private int FindPivotColumn()
+        {
+            int pivotColumn = -1;
+            int minRatioColumn = -1;
+            double minRatio = double.MaxValue;
+
+            // Find the pivot column (entering variable)
+            for (int column = 0; column < matrix[0].Length; column++)
+            {
+                if (functionValues[column] > 0)
+                {
+                    for (int row = 0; row < matrix.Length; row++)
+                    {
+                        if (matrix[row][column] > 0)
+                        {
+                            double ratio = restrictionValues[row] / matrix[row][column];
+                            if (minRatioColumn == -1 || ratio < minRatio)
+                            {
+                                minRatioColumn = column;
+                                minRatio = ratio;
+                            }
+                        }
+                    }
+                }
+            }
+
+            pivotColumn = minRatioColumn;
+            return pivotColumn;
+        }
+
+        private int FindPivotRow(int pivotColumn)
+        {
+            int pivotRow = -1;
+            double minRatio = double.MaxValue;
+
+            // Find the pivot row (leaving variable)
+            for (int row = 0; row < matrix.Length; row++)
+            {
+                if (matrix[row][pivotColumn] > 0)
+                {
+                    double ratio = restrictionValues[row] / matrix[row][pivotColumn];
+                    if (pivotRow == -1 || ratio < minRatio)
+                    {
+                        pivotRow = row;
+                        minRatio = ratio;
+                    }
+                }
+            }
+
+            return pivotRow;
+        }
+
+        private void PerformPivotOperation(int pivotRow, int pivotColumn)
+        {
+            OutputTableau();
+            // Perform the pivot operation to update the tableau based on the pivot row and pivot column
+            double pivotElement = matrix[pivotRow][pivotColumn];
+
+            // Divide the pivot row by the pivot element to make the pivot element 1
+            for (int column = 0; column < matrix[pivotRow].Length; column++)
+            {
+                matrix[pivotRow][column] /= pivotElement;
+            }
+
+            // Perform row operations to make other elements in the pivot column 0
+            for (int row = 0; row < matrix.Length; row++)
+            {
+                if (row != pivotRow)
+                {
+                    double multiplier = matrix[row][pivotColumn];
+                    for (int column = 0; column < matrix[row].Length; column++)
+                    {
+                        matrix[row][column] -= multiplier * matrix[pivotRow][column];
+                    }
+                }
+            }
+
+            // Update the function values based on the pivot column
+            double pivotFunctionValue = functionValues[pivotColumn];
+            for (int column = 0; column < functionValues.Length; column++)
+            {
+                functionValues[column] -= pivotFunctionValue * matrix[pivotRow][column];
+            }
+            OutputTableau();
+        }
+
+        private void UpdateTableau(int pivotRow, int pivotColumn)
+        {
+            // Update the matrix
+            double pivotElement = matrix[pivotRow][pivotColumn];
+            for (int row = 0; row < matrix.Length; row++)
+            {
+                for (int column = 0; column < matrix[row].Length; column++)
+                {
+                    if (row != pivotRow && column != pivotColumn)
+                    {
+                        double multiplier = matrix[row][pivotColumn];
+                        matrix[row][column] -= multiplier * matrix[pivotRow][column] / pivotElement;
+                    }
+                }
+            }
+
+            // Update the pivot row
+            for (int column = 0; column < matrix[pivotRow].Length; column++)
+            {
+                if (column != pivotColumn)
+                {
+                    matrix[pivotRow][column] /= pivotElement;
+                }
+            }
+            matrix[pivotRow][pivotColumn] = 1 / pivotElement;
+
+            // Update the function values
+            double pivotFunctionValue = functionValues[pivotColumn];
+            for (int column = 0; column < functionValues.Length; column++)
+            {
+                if (column != pivotColumn)
+                {
+                    functionValues[column] -= pivotFunctionValue * matrix[pivotRow][column] / pivotElement;
+                }
+            }
+            functionValues[pivotColumn] = -pivotFunctionValue / pivotElement;
+        }
+
+        public void Solve()
+        {
+            int iterations = 0;
+
+            while (true)
+            {
+                int pivotColumn = FindPivotColumn();
+                if (pivotColumn == -1)
+                {
+                    // Optimality reached, no positive coefficients in the objective function
+                    break;
+                }
+
+                int pivotRow = FindPivotRow(pivotColumn);
+                if (pivotRow == -1)
+                {
+                    // Unbounded problem, no suitable pivot row found
+                    break;
+                }
+
+                PerformPivotOperation(pivotRow, pivotColumn);
+                UpdateTableau(pivotRow, pivotColumn);
+
+                iterations++;
+            }
+
+            OutputTableau();
+
+            Console.WriteLine("Function Values:");
+            for (int column = 0; column < functionValues.Length; column++)
+            {
+                Console.Write(functionValues[column] + "\t");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("Iterations: " + iterations);
+        }
+
+        private void OutputTableau()
+        {
+            Console.WriteLine("Tableau:");
+            for (int row = 0; row < matrix.Length; row++)
+            {
+                for (int column = 0; column < matrix[row].Length; column++)
+                {
+                    Console.Write(matrix[row][column] + "\t");
+                }
+
+                Console.WriteLine(restrictionValues[row]);
+            }
+        }
+    }
+
 
 }
