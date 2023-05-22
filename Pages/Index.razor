@@ -1,5 +1,6 @@
 ﻿@page "/"
 @using Microsoft.AspNetCore.Components
+@using System.Text.Json
 
 <div style="display: flex; gap: 16px;">
     <h1>Variabile:</h1>
@@ -65,6 +66,65 @@
     </div>
 
     <button @onclick="OnCheckButtonClicked">Check</button>
+    <hr />
+
+    @if (simplexSteps != null)
+    {
+        <h2>Simplex Algorithm Steps:</h2>
+        @foreach (var step in simplexSteps)
+        {
+            <div>
+                <h3>Step @step.StepNumber:</h3>
+                <p>Table:</p>
+                <table>
+                    <thead>
+                        <tr>
+                            @for (int i = 0; i < step.TableHeaders.Length; i++)
+                            {
+                                <th>@step.TableHeaders[i]</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < step.TableRows.Length; i++)
+                        {
+                            <tr>
+                                @for (int j = 0; j < step.TableRows[i].Length; j++)
+                                {
+                                    <td>@step.TableRows[i][j]</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <p>Delta J:</p>
+                <table>
+                    <thead>
+                        <tr>
+                            @for (int i = 0; i < step.DeltaJ.Length; i++)
+                            {
+                                <th>@step.DeltaJ[i]</th>
+                            }
+                        </tr>
+                    </thead>
+                </table>
+
+                <p>CB:</p>
+                <table>
+                    <thead>
+                        <tr>
+                            @for (int i = 0; i < step.CB.Length; i++)
+                            {
+                                <th>@step.CB[i]</th>
+                            }
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+            <hr />
+        }
+    }
 }
 
 @code
@@ -78,10 +138,14 @@
     private double[] functionValues;
     private double[] restrictionValues;
 
+    private List<SimplexStep> simplexSteps;
     private void genereazaTabel()
     {
-        if (tabelVisible) tabelVisible = false;
-        StateHasChanged();
+        if (tabelVisible)
+        {
+            tabelVisible = false;
+            StateHasChanged();
+        }
 
         matrix = new double[restrictii][];
         for (int i = 0; i < restrictii; i++)
@@ -94,16 +158,7 @@
         }
 
         functionValues = new double[variabile];
-        for (int i = 0; i < variabile; i++)
-        {
-            functionValues[i] = 0;
-        }
-
         restrictionValues = new double[restrictii];
-        for (int i = 0; i < restrictii; i++)
-        {
-            restrictionValues[i] = 0;
-        }
 
         tabelVisible = true;
         StateHasChanged();
@@ -111,8 +166,8 @@
 
     private void OnCheckButtonClicked()
     {
-        SimplexSolver solver = new SimplexSolver(matrix, functionValues, restrictionValues, SelectedMode);
-        solver.Solve();
+    // Perform simplex algorithm calculations and store the steps
+        simplexSteps = PerformSimplexAlgorithm();
     }
 
     private void CustomFunction(ChangeEventArgs e, int i, int j)
@@ -122,7 +177,6 @@
         {
             matrix[i][j] = value;
         }
-
     }
 
     private void CustomFunction2(ChangeEventArgs e, int row, double value)
@@ -142,293 +196,184 @@
         {
             restrictionValues[i] = value; // Update the array with the modified value
         }
-
     }
 
-    public class SimplexSolver
+    private List<SimplexStep> PerformSimplexAlgorithm()
     {
-        private double[][] matrix;
-        private double[] functionValues;
-        private double[] restrictionValues;
-        private string selectedMode;
+        var steps = new List<SimplexStep>();
 
-        public SimplexSolver(double[][] matrix, double[] functionValues, double[] restrictionValues, string selectedMode)
+        // Validate sizes of arrays
+        if (matrix.Length != restrictii || functionValues.Length != variabile || restrictionValues.Length != restrictii)
         {
-            this.matrix = matrix;
-            this.functionValues = functionValues;
-            this.restrictionValues = restrictionValues;
-            this.selectedMode = selectedMode;
+            return steps; // Return empty steps list if sizes are inconsistent
         }
 
-        public void Solve()
+        // Step 0: Initial table setup
+        var table = new double[restrictii + 1][];
+        for (int i = 0; i <= restrictii; i++)
         {
-            int var_principale = matrix[0].Length;
-            double[] F = functionValues;
-            double[][] Conditii = matrix;
-            double[] b = restrictionValues;
-
-            int numRestrictions = Conditii.Length;
-            int numVariables = var_principale;
-
-            double[][] A = new double[numRestrictions][];
-            for (int i = 0; i < numRestrictions; i++)
+            table[i] = new double[variabile + restrictii];
+            for (int j = 0; j < variabile + restrictii; j++)
             {
-                A[i] = new double[numVariables + numRestrictions + 1];
-                for (int j = 0; j < numVariables; j++)
-                {
-                    A[i][j] = Conditii[i][j];
-                }
-                A[i][numVariables + i] = 1;
-                A[i][A[i].Length - 1] = b[i];
-            }
-
-            double[] Cj = new double[A[0].Length];
-            Cj[0] = selectedMode == "max" ? -1 * F[0] : F[0];
-            for (int i = 0; i < var_principale; i++)
-            {
-                Cj[i + 1] = selectedMode == "max" ? -1 * F[i] : F[i];
-            }
-
-            int[] VS = new int[A.Length];
-            for (int i = 0; i < VS.Length; i++)
-            {
-                VS[i] = numVariables + i + 1;
-            }
-
-            bool RUN = true;
-            while (RUN)
-            {
-                double[] Zj = CalculateZj(Cj, A, VS);
-                double[] deltaJ = CalculateDeltaJ(Cj, Zj);
-
-                if (AnyPositive(deltaJ))
-                {
-                    Console.WriteLine("Testul de optimalitate nu este valid");
-                    Console.WriteLine("Trecem la urmatoarea iteratie");
-                    Console.Write("Vechea baza: ");
-                    double[] doubleVS = Array.ConvertAll(VS, x => (double)x);
-                    PrintArray(doubleVS);
-                    
-
-                    int col_pivot = FindEnteringVariable(deltaJ);
-                    Console.WriteLine("\nAplicam criteriul de intrare in baza C↓B");
-                    Console.WriteLine($"max(deltaj>0) = {deltaJ[col_pivot]} care corespunde vectorului a{col_pivot + 1}");
-                    Console.WriteLine($"Deci a{col_pivot + 1}↓B");
-
-                    Console.WriteLine("\nAplicam criteriul de iesire din baza C↑B");
-                    int rand_pivot = FindLeavingVariable(A, col_pivot);
-                    Console.WriteLine($"min{{XB/ak}} = {CalculateMinRatio(A, rand_pivot)} care corespunde vectorului a{VS[rand_pivot]}");
-                    Console.WriteLine($"Deci a{VS[rand_pivot]}↑B");
-
-                    VS[rand_pivot] = col_pivot + 1;
-                    Console.WriteLine($"\nNoua baza B = {{a{VS[0]}, a{VS[1]}, a{VS[2]}}} (exemplu pentru 3 variabile)");
-
-                    double pivot = A[rand_pivot][col_pivot];
-
-                    A[rand_pivot] = DivideArrayByScalar(A[rand_pivot], pivot);
-
-                    for (int i = 0; i < A.Length; i++)
-                    {
-                        if (i != rand_pivot)
-                        {
-                            double[] temp = MultiplyArrayByScalar(A[rand_pivot], A[i][col_pivot]);
-                            A[i] = SubtractArrays(A[i], temp);
-                        }
-                    }
-                    Console.WriteLine("\nNoua matrice A:");
-                    PrintMatrix(A);
-
-                    Console.WriteLine("\nNoul vector Cj:");
-                    PrintArray(Cj);
-                }
-                else
-                {
-                    RUN = false;
-                    Console.WriteLine("\nSolutia optima a fost atinsa!");
-                    Console.WriteLine("Tabelul final:");
-
-                    double[] Xb = new double[A.Length];
-                    double[] X = new double[A[0].Length - 1];
-                    double fx = selectedMode == "max" ? CalculateFx(Zj, Xb) : -1 * CalculateFx(Zj, Xb);
-
-                    for (int i = 0; i < VS.Length; i++)
-                    {
-                        X[VS[i]] = Xb[i];
-                    }
-
-                    Console.WriteLine("X = ");
-                    for (int i = 0; i < X.Length; i++)
-                    {
-                        Console.WriteLine($"x{i + 1} = {X[i]}");
-                    }
-                }
+                if (i < restrictii && j < variabile)
+                    table[i][j] = matrix[i][j];
+                else if (i < restrictii && j >= variabile && j < variabile + restrictii)
+                    table[i][j] = (j - variabile == i) ? 1 : 0;
+                else if (i == restrictii && j < variabile)
+                    table[i][j] = functionValues[j];
+                else if (i == restrictii && j >= variabile && j < variabile + restrictii)
+                    table[i][j] = (j - variabile == i) ? 1 : 0;
             }
         }
 
-        private double[] CalculateZj(double[] Cj, double[][] A, int[] VS)
+        int indexOfSecundary=variabile;
+        // Step 0: Calculate CB
+        var CbInitial = new double[variabile+restrictii];
+        for (int i = 0; i < variabile+restrictii; i++)
         {
-            double[] Zj = new double[Cj.Length];
-
-            for (int j = 0; j < Cj.Length; j++)
-            {
-                for (int i = 0; i < VS.Length; i++)
-                {
-                    Zj[j] += Cj[VS[i] - 1] * A[i][j];
-                }
-            }
-
-            return Zj;
+            if(i<variabile)
+                CbInitial[i] = functionValues[i];
+            else
+                CbInitial[i] = 0;
         }
 
-        private double[] CalculateDeltaJ(double[] Cj, double[] Zj)
+        //step 0 : Calculate Zj
+        var zj = new double[variabile + restrictii];
+        for(int i =0; i< variabile + restrictii; i++)
         {
-            double[] deltaJ = new double[Cj.Length];
-
-            for (int j = 0; j < Cj.Length; j++)
+            double sum = 0;
+                for(int j = indexOfSecundary; j< restrictii; j++)
             {
-                deltaJ[j] = Cj[j] - Zj[j];
+                sum += table[j][i] * CbInitial[j];
             }
-
-            return deltaJ;
+                zj[i] = sum;
+        }
+        // Step 0: Calculate DeltaJ
+        var deltaJ = new double[variabile + restrictii];
+        for (int j = 0; j < variabile + restrictii; j++)
+        {
+            Console.WriteLine($"cb:{CbInitial[j]} ; zj:{zj[j]}");
+            deltaJ[j] = CbInitial[j] - zj[j];
         }
 
-        private bool AnyPositive(double[] array)
+
+    // Step 0: Add initial step to the list
+        steps.Add(new SimplexStep
         {
-            foreach (var value in array)
-            {
-                if (value > 0)
-                    return true;
-            }
-            return false;
-        }
+            StepNumber = 0,
+            TableHeaders = GenerateTableHeaders(),
+            TableRows = GenerateTableRows(table),
+            DeltaJ = deltaJ.Select(d => d.ToString()).ToArray(),
+            CB = CbInitial.Select(c => c.ToString()).ToArray()
+        });
 
-        private int FindEnteringVariable(double[] deltaJ)
-        {
-            double max = deltaJ[0];
-            int col_pivot = 0;
+        Console.WriteLine("initial");
+    // // Step 1: Find pivot column
+    //     int pivotColumnIndex = Array.IndexOf(deltaJ, deltaJ.Max());
+    //
+    //     while (deltaJ[pivotColumnIndex] > 0)
+    //     {
+    // // Step 2: Find pivot row
+    //         var ratios = new List<double>();
+    //         for (int i = 0; i < restrictii; i++)
+    //         {
+    //             if (table[i][pivotColumnIndex] > 0)
+    //                 ratios.Add(table[i][variabile + restrictii] / table[i][pivotColumnIndex]);
+    //             else
+    //                 ratios.Add(double.PositiveInfinity);
+    //         }
+    //         int pivotRowIndex = ratios.IndexOf(ratios.Min());
+    //         Console.WriteLine(
+    //         "test");
+    // // Step 3: Update pivot row
+    //         double pivotValue = table[pivotRowIndex][pivotColumnIndex];
+    //         for (int j = 0; j <= variabile + restrictii; j++)
+    //         {
+    //             table[pivotRowIndex][j] /= pivotValue;
+    //         }
+    //
+    // // Step 4: Update other rows
+    //         for (int i = 0; i <= restrictii; i++)
+    //         {
+    //             if (i != pivotRowIndex)
+    //             {
+    //                 double factor = table[i][pivotColumnIndex];
+    //                 for (int j = 0; j <= variabile + restrictii; j++)
+    //                 {
+    //                     table[i][j] -= factor * table[pivotRowIndex][j];
+    //                 }
+    //             }
+    //         }
+    //
+    // // Step 5: Update CB and DeltaJ
+    //         for (int i = 0; i < variabile + restrictii; i++)
+    //         {
+    //             double sum = 0;
+    //             for (int j = 0; j < restrictii; j++)
+    //             {
+    //                 sum += table[j][i] * cb[j];
+    //             }
+    //             deltaJ[i] = cb[i] - sum;
+    //         }
+    //
+    // // Step 6: Add current step to the list
+    //         steps.Add(new SimplexStep
+    //         {
+    //             StepNumber = steps.Count,
+    //             TableHeaders = GenerateTableHeaders(),
+    //             TableRows = GenerateTableRows(table),
+    //             DeltaJ = deltaJ.Select(d => d.ToString()).ToArray(),
+    //             CB = cb.Select(c => c.ToString()).ToArray()
+    //         });
+    //
+    // // Step 7: Find next pivot column
+    //         pivotColumnIndex = Array.IndexOf(deltaJ, deltaJ.Max());
+    //     }
 
-            for (int j = 1; j < deltaJ.Length; j++)
-            {
-                if (deltaJ[j] > max)
-                {
-                    max = deltaJ[j];
-                    col_pivot = j;
-                }
-            }
-
-            return col_pivot;
-        }
-
-        private int FindLeavingVariable(double[][] A, int col_pivot)
-        {
-            int minRatioIndex = -1;
-            double minRatio = double.MaxValue;
-
-            for (int i = 0; i < A.Length; i++)
-            {
-                if (A[i][col_pivot] > 0)
-                {
-                    double ratio = A[i][A[i].Length - 1] / A[i][col_pivot];
-                    if (ratio < minRatio)
-                    {
-                        minRatio = ratio;
-                        minRatioIndex = i;
-                    }
-                }
-            }
-
-            return minRatioIndex;
-        }
-
-        private double CalculateMinRatio(double[][] A, int row_pivot)
-        {
-            double minRatio = double.MaxValue;
-
-            for (int j = 0; j < A[row_pivot].Length - 1; j++)
-            {
-                if (A[row_pivot][j] > 0)
-                {
-                    double ratio = A[row_pivot][A[row_pivot].Length - 1] / A[row_pivot][j];
-                    if (ratio < minRatio)
-                    {
-                        minRatio = ratio;
-                    }
-                }
-            }
-
-            return minRatio;
-        }
-
-        private double[] DivideArrayByScalar(double[] array, double scalar)
-        {
-            double[] result = new double[array.Length];
-
-            for (int i = 0; i < array.Length; i++)
-            {
-                result[i] = array[i] / scalar;
-            }
-
-            return result;
-        }
-
-        private double[] MultiplyArrayByScalar(double[] array, double scalar)
-        {
-            double[] result = new double[array.Length];
-
-            for (int i = 0; i < array.Length; i++)
-            {
-                result[i] = array[i] * scalar;
-            }
-
-            return result;
-        }
-
-        private double[] SubtractArrays(double[] array1, double[] array2)
-        {
-            double[] result = new double[array1.Length];
-
-            for (int i = 0; i < array1.Length; i++)
-            {
-                result[i] = array1[i] - array2[i];
-            }
-
-            return result;
-        }
-
-        private double CalculateFx(double[] Zj, double[] Xb)
-        {
-            double fx = 0;
-
-            for (int i = 0; i < Xb.Length; i++)
-            {
-                fx += Zj[i] * Xb[i];
-            }
-
-            return fx;
-        }
-
-        private void PrintArray(double[] array)
-        {
-            Console.Write("[ ");
-            foreach (var value in array)
-            {
-                Console.Write(value + " ");
-            }
-            Console.WriteLine("]");
-        }
-
-        private void PrintMatrix(double[][] matrix)
-        {
-            for (int i = 0; i < matrix.Length; i++)
-            {
-                for (int j = 0; j < matrix[i].Length; j++)
-                {
-                    Console.Write(matrix[i][j] + " ");
-                }
-                Console.WriteLine();
-            }
-        }
+        return steps;
     }
 
+    private string[] GenerateTableHeaders()
+    {
+        var headers = new List<string>();
 
+        for (int j = 0; j < variabile + restrictii; j++)
+        {
+            if (j < variabile)
+            {
+                headers.Add($"x{j}");
+            }
+            else
+            {
+                headers.Add($"s{j - variabile + 1}");
+            }
+        }
+
+        return headers.ToArray();
+    }
+
+    private string[][] GenerateTableRows(double[][] table)
+    {
+        var rows = new List<string[]>();
+
+        for (int i = 0; i < restrictii; i++)
+        {
+            var row = new List<string>();
+            for (int j = 0; j < variabile + restrictii; j++)
+            {
+                row.Add(table[i][j].ToString());
+            }
+            rows.Add(row.ToArray());
+        }
+
+        return rows.ToArray();
+    }
+    public class SimplexStep
+    {
+        public int StepNumber { get; set; }
+        public string[] TableHeaders { get; set; }
+        public string[][] TableRows { get; set; }
+        public string[] DeltaJ { get; set; }
+        public string[] CB { get; set; }
+    }
 }
