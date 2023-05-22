@@ -199,139 +199,105 @@
     }
 
     private List<SimplexStep> PerformSimplexAlgorithm()
+{
+    var steps = new List<SimplexStep>();
+
+    // Validate sizes of arrays
+    if (matrix.Length != restrictii || functionValues.Length != variabile || restrictionValues.Length != restrictii)
     {
-        var steps = new List<SimplexStep>();
+        return steps; // Return empty steps list if sizes are inconsistent
+    }
 
-        // Validate sizes of arrays
-        if (matrix.Length != restrictii || functionValues.Length != variabile || restrictionValues.Length != restrictii)
-        {
-            return steps; // Return empty steps list if sizes are inconsistent
-        }
-
-        // Step 0: Initial table setup
-        var table = new double[restrictii + 1][];
-        for (int i = 0; i <= restrictii; i++)
-        {
-            table[i] = new double[variabile + restrictii];
-            for (int j = 0; j < variabile + restrictii; j++)
-            {
-                if (i < restrictii && j < variabile)
-                    table[i][j] = matrix[i][j];
-                else if (i < restrictii && j >= variabile && j < variabile + restrictii)
-                    table[i][j] = (j - variabile == i) ? 1 : 0;
-                else if (i == restrictii && j < variabile)
-                    table[i][j] = functionValues[j];
-                else if (i == restrictii && j >= variabile && j < variabile + restrictii)
-                    table[i][j] = (j - variabile == i) ? 1 : 0;
-            }
-        }
-
-        int indexOfSecundary=variabile;
-        // Step 0: Calculate CB
-        var CbInitial = new double[variabile+restrictii];
-        for (int i = 0; i < variabile+restrictii; i++)
-        {
-            if(i<variabile)
-                CbInitial[i] = functionValues[i];
-            else
-                CbInitial[i] = 0;
-        }
-
-        //step 0 : Calculate Zj
-        var zj = new double[variabile + restrictii];
-        for(int i =0; i< variabile + restrictii; i++)
-        {
-            double sum = 0;
-                for(int j = indexOfSecundary; j< restrictii; j++)
-            {
-                sum += table[j][i] * CbInitial[j];
-            }
-                zj[i] = sum;
-        }
-        // Step 0: Calculate DeltaJ
-        var deltaJ = new double[variabile + restrictii];
+    // Step 0: Initial table setup
+    var table = new double[restrictii + 1][];
+    for (int i = 0; i <= restrictii; i++)
+    {
+        table[i] = new double[variabile + restrictii];
         for (int j = 0; j < variabile + restrictii; j++)
         {
-            Console.WriteLine($"cb:{CbInitial[j]} ; zj:{zj[j]}");
-            deltaJ[j] = CbInitial[j] - zj[j];
+            if (i < restrictii && j < variabile)
+                table[i][j] = matrix[i][j];
+            else if (i < restrictii && j >= variabile && j < variabile + restrictii)
+                table[i][j] = (j - variabile == i) ? 1 : 0;
+            else if (i == restrictii && j < variabile)
+                table[i][j] = functionValues[j];
+            else if (i == restrictii && j >= variabile && j < variabile + restrictii)
+                table[i][j] = (j - variabile == i) ? 1 : 0;
+        }
+    }
+
+    // Step 0: Calculate CB
+    var CbInitial = CalculateCB();
+        var coefBazeiIndex = new double[restrictii];
+for (int i = 0; i < restrictii; i++)
+        {
+            coefBazeiIndex[i] = variabile + i;
         }
 
+    // Step 0: Calculate Zj
+    var zj = CalculateZj(table, CbInitial,coefBazeiIndex);
+
+    // Step 0: Calculate DeltaJ
+    var deltaJ = CalculateDeltaJ(CbInitial, zj, coefBazeiIndex);
 
     // Step 0: Add initial step to the list
-        steps.Add(new SimplexStep
-        {
-            StepNumber = 0,
-            TableHeaders = GenerateTableHeaders(),
-            TableRows = GenerateTableRows(table),
-            DeltaJ = deltaJ.Select(d => d.ToString()).ToArray(),
-            CB = CbInitial.Select(c => c.ToString()).ToArray()
-        });
+    steps.Add(new SimplexStep
+    {
+        StepNumber = 0,
+        TableHeaders = GenerateTableHeaders(),
+        TableRows = GenerateTableRows(table),
+        DeltaJ = deltaJ.Select(d => d.ToString()).ToArray(),
+        CB = CbInitial.Select(c => c.ToString()).ToArray()
+    });
 
-        Console.WriteLine("initial");
-    // // Step 1: Find pivot column
-    //     int pivotColumnIndex = Array.IndexOf(deltaJ, deltaJ.Max());
-    //
-    //     while (deltaJ[pivotColumnIndex] > 0)
-    //     {
-    // // Step 2: Find pivot row
-    //         var ratios = new List<double>();
-    //         for (int i = 0; i < restrictii; i++)
-    //         {
-    //             if (table[i][pivotColumnIndex] > 0)
-    //                 ratios.Add(table[i][variabile + restrictii] / table[i][pivotColumnIndex]);
-    //             else
-    //                 ratios.Add(double.PositiveInfinity);
-    //         }
-    //         int pivotRowIndex = ratios.IndexOf(ratios.Min());
-    //         Console.WriteLine(
-    //         "test");
-    // // Step 3: Update pivot row
-    //         double pivotValue = table[pivotRowIndex][pivotColumnIndex];
-    //         for (int j = 0; j <= variabile + restrictii; j++)
-    //         {
-    //             table[pivotRowIndex][j] /= pivotValue;
-    //         }
-    //
-    // // Step 4: Update other rows
-    //         for (int i = 0; i <= restrictii; i++)
-    //         {
-    //             if (i != pivotRowIndex)
-    //             {
-    //                 double factor = table[i][pivotColumnIndex];
-    //                 for (int j = 0; j <= variabile + restrictii; j++)
-    //                 {
-    //                     table[i][j] -= factor * table[pivotRowIndex][j];
-    //                 }
-    //             }
-    //         }
-    //
-    // // Step 5: Update CB and DeltaJ
-    //         for (int i = 0; i < variabile + restrictii; i++)
-    //         {
-    //             double sum = 0;
-    //             for (int j = 0; j < restrictii; j++)
-    //             {
-    //                 sum += table[j][i] * cb[j];
-    //             }
-    //             deltaJ[i] = cb[i] - sum;
-    //         }
-    //
-    // // Step 6: Add current step to the list
-    //         steps.Add(new SimplexStep
-    //         {
-    //             StepNumber = steps.Count,
-    //             TableHeaders = GenerateTableHeaders(),
-    //             TableRows = GenerateTableRows(table),
-    //             DeltaJ = deltaJ.Select(d => d.ToString()).ToArray(),
-    //             CB = cb.Select(c => c.ToString()).ToArray()
-    //         });
-    //
-    // // Step 7: Find next pivot column
-    //         pivotColumnIndex = Array.IndexOf(deltaJ, deltaJ.Max());
-    //     }
+    return steps;
+}
 
-        return steps;
+private double[] CalculateCB()
+{
+    var cb = new double[variabile + restrictii];
+    for (int i = 0; i < variabile; i++)
+    {
+        cb[i] = functionValues[i];
     }
+    for (int i = variabile; i < variabile + restrictii; i++)
+    {
+        cb[i] = 0;
+    }
+    Console.WriteLine("cb");
+    Console.WriteLine(JsonSerializer.Serialize(cb));
+    return cb;
+}
+
+private double[] CalculateZj(double[][] table, double[] cb,double[] indexOfBase)
+{
+    var zj = new double[variabile + restrictii];
+    for (int i = 0; i < variabile + restrictii; i++)
+    {
+        double sum = 0;
+        for (int j = 0; j < restrictii; j++)
+        {
+            if(indexOfBase.Contains(j)) sum += table[j][i] * cb[j];
+        }
+        zj[i] = sum;
+    }
+    Console.WriteLine("zj");
+    Console.WriteLine(JsonSerializer.Serialize(zj));
+    return zj;
+}
+
+    private double[] CalculateDeltaJ(double[] cb, double[] zj, double[] indexOfBase )
+{
+    var deltaJ = new double[variabile + restrictii];
+    for (int j = 0; j < variabile + restrictii; j++)
+    {
+        if(indexOfBase.Contains(j)) deltaJ[j] = 0;
+        else deltaJ[j] = cb[j] - zj[j];
+    }
+    Console.WriteLine("dj");
+    Console.WriteLine(JsonSerializer.Serialize(deltaJ));
+    return deltaJ;
+}
 
     private string[] GenerateTableHeaders()
     {
