@@ -1,10 +1,4 @@
 ﻿@page "/"
-@using System.Text.Json
-@using System.Numerics
-@using System.Runtime.InteropServices.ComTypes
-@using Microsoft.AspNetCore.Components.Forms
-@using Microsoft.AspNetCore.Components.Web.Infrastructure
-@using System.Threading.Tasks
 @using Microsoft.AspNetCore.Components
 
 <div style="display: flex; gap: 16px;">
@@ -57,6 +51,13 @@
                                 </td>
                             }
                         }
+
+                        @if (i < restrictionValues?.Length)
+                        {
+                            int row = i; // Create a local copy of i
+                            <td><p>asd</p></td>
+                            <td><input type="number" value="@restrictionValues[i]" @oninput="(e) => CustomFunction3(e, row)" /></td>
+                        }
                     </tr>
                 }
             </tbody>
@@ -75,7 +76,7 @@
 
     private int[][] matrix;
     private int[] functionValues;
-
+    private int[] restrictionValues;
 
     private void genereazaTabel()
     {
@@ -98,19 +99,19 @@
             functionValues[i] = 0;
         }
 
+        restrictionValues = new int[restrictii];
+        for (int i = 0; i < restrictii; i++)
+        {
+            restrictionValues[i] = 0;
+        }
+
         tabelVisible = true;
         StateHasChanged();
     }
 
     private void OnCheckButtonClicked()
     {
-        for (int i = 0; i < matrix?.Length; i++)
-        {
-            for (int j = 0; j < matrix[i]?.Length; j++)
-            {
-                Console.WriteLine(matrix[i][j]);
-            }
-        }
+        Console.WriteLine("hello world");
     }
 
     private void CustomFunction(ChangeEventArgs e, int i, int j)
@@ -132,4 +133,17 @@
         Console.WriteLine($"value: {value}, row = {row}");
         functionValues[row] = value; // Update the array with the modified value
     }
+
+    private void CustomFunction3(ChangeEventArgs e, int i)
+    {
+        int value;
+        if (int.TryParse(e.Value.ToString(), out value))
+        {
+            restrictionValues[i] = value; // Update the array with the modified value
+        }
+        Console.WriteLine($"value: {value}, i = {i}");
+    }
+
+    
+
 }
