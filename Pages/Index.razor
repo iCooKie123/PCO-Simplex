@@ -2,6 +2,19 @@
 @using Microsoft.AspNetCore.Components
 @using System.Text.Json
 
+<style>
+    .table-container table {
+        border-collapse: collapse; /* Optional: Collapse the border spacing */
+    }
+
+    .table-container th,
+    .table-container td {
+        border: 1px solid black; /* Add border to table cells */
+        padding: 8px; /* Optional: Add padding for better spacing */
+    }
+</style>
+
+
 <div style="display: flex; gap: 16px;">
     <h1>Variabile:</h1>
     <input type="number" @bind="@variabile" />
@@ -71,59 +84,54 @@
     @if (simplexSteps != null)
     {
         <h2>Simplex Algorithm Steps:</h2>
-        @foreach (var step in simplexSteps)
-        {
-            <div>
-                <h3>Step @step.StepNumber:</h3>
-                <p>Table:</p>
-                <table>
-                    <thead>
-                        <tr>
-                            @for (int i = 0; i < step.TableHeaders.Length; i++)
-                            {
-                                <th>@step.TableHeaders[i]</th>
-                            }
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @for (int i = 0; i < step.TableRows.Length; i++)
-                        {
+        <div class="table-container">
+            @foreach (var step in simplexSteps)
+            {
+                <div>
+                    <h3>Step @step.StepNumber:</h3>
+                    <p>Table:</p>
+                    <table>
+                        <thead>
                             <tr>
-                                @for (int j = 0; j < step.TableRows[i].Length; j++)
+                                @for (int i = 0; i < step.TableHeaders.Length; i++)
                                 {
-                                    <td>@step.TableRows[i][j]</td>
+                                    <th>@step.TableHeaders[i]</th>
                                 }
                             </tr>
-                        }
-                    </tbody>
-                </table>
-
-                <p>Delta J:</p>
-                <table>
-                    <thead>
-                        <tr>
-                            @for (int i = 0; i < step.DeltaJ.Length; i++)
+                        </thead>
+                        <tbody>
+                            @for (int i = 0; i < step.TableRows.Length; i++)
                             {
-                                <th>@step.DeltaJ[i]</th>
+                                <tr>
+                                    @for (int j = 0; j < step.TableRows[i].Length; j++)
+                                    {
+                                        <td>@step.TableRows[i][j]</td>
+                                    }
+                                </tr>
                             }
-                        </tr>
-                    </thead>
-                </table>
+                        </tbody>
+                    </table>
 
-                <p>CB:</p>
-                <table>
-                    <thead>
-                        <tr>
-                            @for (int i = 0; i < step.CB.Length; i++)
-                            {
-                                <th>@step.CB[i]</th>
-                            }
-                        </tr>
-                    </thead>
-                </table>
-            </div>
-            <hr />
-        }
+                    <p>Delta J:</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                @for (int i = 0; i < step.DeltaJ.Length; i++)
+                                {
+                                    <th>@step.DeltaJ[i]</th>
+                                }
+                            </tr>
+                        </thead>
+                    </table>
+
+                    @if (step.PivotElement != null)
+                    {
+                        <p> pivot: @step.PivotElement</p>
+                    }
+                </div>
+                <hr />
+            }
+        </div>
     }
 }
 
@@ -166,7 +174,7 @@
 
     private void OnCheckButtonClicked()
     {
-    // Perform simplex algorithm calculations and store the steps
+        // Perform simplex algorithm calculations and store the steps
         simplexSteps = PerformSimplexAlgorithm();
     }
 
@@ -199,105 +207,218 @@
     }
 
     private List<SimplexStep> PerformSimplexAlgorithm()
-{
-    var steps = new List<SimplexStep>();
-
-    // Validate sizes of arrays
-    if (matrix.Length != restrictii || functionValues.Length != variabile || restrictionValues.Length != restrictii)
     {
-        return steps; // Return empty steps list if sizes are inconsistent
+        Console.WriteLine("start");
+        var steps = new List<SimplexStep>();
+
+        // Validate sizes of arrays
+        if (matrix.Length != restrictii || functionValues.Length != variabile || restrictionValues.Length != restrictii)
+        {
+            return steps; // Return empty steps list if sizes are inconsistent
+        }
+
+        // Step 0: Initial table setup
+        var table = new double[restrictii][];
+        var indexOfOne = variabile;
+        for (int i = 0; i < restrictii; i++)
+        {
+            table[i] = new double[variabile + restrictii];
+            for (int j = 0; j < variabile + restrictii; j++)
+            {
+                if (j < variabile)
+                {
+                    table[i][j] = matrix[i][j];
+                }
+                else
+                {
+                    if (j == indexOfOne)
+                    {
+                        table[i][j] = 1;
+                    }
+                    else
+                    {
+                        table[i][j] = 0;
+                    }
+
+                }
+            }
+            indexOfOne++;
+        } //this is correct
+
+
+        var xb = (double[])restrictionValues.Clone();
+
+        //calculam baza si coef bazei
+        double[] baza = new double[restrictii];
+        var primaBaza = variabile;
+        for (int i = 0; i < restrictii; i++)
+        {
+            baza[i] = primaBaza;
+            primaBaza++;
+        }
+        Console.WriteLine($"baza: {JsonSerializer.Serialize(baza)}");
+        double[] coefBazeiInit = new double[restrictii + variabile];
+        for (int i = 0; i < restrictii + variabile; i++)
+        {
+            if (i < restrictii)
+            {
+                coefBazeiInit[i] = functionValues[i];
+            }
+            else
+            {
+                coefBazeiInit[i] = 0;
+            }
+        }
+        Console.WriteLine($"Coef bazei init: {JsonSerializer.Serialize(coefBazeiInit)}");
+        double[] coefBazei = baza.Select(i => coefBazeiInit[(int)i]).ToArray();
+        Console.WriteLine($"Coef bazei calculat : {JsonSerializer.Serialize(coefBazei)}");
+        var zj = CalculateZj(table, coefBazei);
+        Console.WriteLine($"ZJ CALCULAT: {JsonSerializer.Serialize(zj)}");
+        var deltaj = CalculateDeltaJ(coefBazeiInit, zj);
+        Console.WriteLine($"dj CALCULAT: {JsonSerializer.Serialize(CalculateDeltaJ(coefBazeiInit, zj))}");
+        //check if the problem is optimal
+        int iterations = 0;
+        while (true)
+        {
+            Console.WriteLine($"optim:{IsOptimal(deltaj)}");
+            if (IsOptimal(deltaj)) break;
+            Console.WriteLine($"iteratia {iterations}");
+            var pivotElementColumn = FindEnteringColumn(deltaj);
+            Console.WriteLine(JsonSerializer.Serialize(table));
+            var pivotElementRow = FindExitingColumn(xb, table, pivotElementColumn);
+            Console.WriteLine(JsonSerializer.Serialize(table));
+            var pivotElement = table[pivotElementRow][pivotElementColumn];
+            Console.WriteLine($"pivot: {pivotElement}");
+            Console.WriteLine(JsonSerializer.Serialize(table));
+            Console.WriteLine($"xb inainte de hau hau:{JsonSerializer.Serialize(xb)}");
+            var tableCopy = (double[][])table.Clone();
+            steps.Add(new SimplexStep
+                {
+                    StepNumber = iterations,
+                    TableHeaders = GenerateTableHeaders(),
+                    TableRows = GenerateTableRows(tableCopy),
+                    DeltaJ = deltaj.Select(d => d.ToString()).ToArray(),
+                    PivotElement = tableCopy[pivotElementRow][pivotElementColumn].ToString(),
+                    XB = xb.Select(x => x.ToString()).ToArray(),
+                    ZJ = zj.Select(z => z.ToString()).ToArray(),
+                    CB = coefBazei.Select(c => c.ToString()).ToArray(),
+                    Baza = baza.Select(b => b.ToString()).ToArray()
+                });
+            PerformTableTransformation(table, pivotElementColumn, pivotElementRow, xb);
+            // calculam baza si coef bazei
+            Console.WriteLine($"xb dupa de hau hau:{JsonSerializer.Serialize(xb)}");
+            baza[pivotElementRow] = pivotElementColumn;
+            Console.WriteLine($"baza: {JsonSerializer.Serialize(baza)}");
+            coefBazei = baza.Select(i => coefBazeiInit[(int)i]).ToArray();
+            Console.WriteLine($"Coef bazei calculat : {JsonSerializer.Serialize(coefBazei)}");
+            zj = CalculateZj(table, coefBazei);
+            Console.WriteLine($"ZJ CALCULAT: {JsonSerializer.Serialize(zj)}");
+            deltaj = CalculateDeltaJ(coefBazeiInit, zj);
+            Console.WriteLine($"dj CALCULAT: {JsonSerializer.Serialize(CalculateDeltaJ(coefBazeiInit, zj))}");
+            iterations++;
+        }
+        steps.Add(new SimplexStep
+            {
+                StepNumber = iterations,
+                TableHeaders = GenerateTableHeaders(),
+                TableRows = GenerateTableRows(table),
+                DeltaJ = deltaj.Select(d => d.ToString()).ToArray(),
+                PivotElement = "Optimal",
+            });
+
+        return steps;
     }
 
-    // Step 0: Initial table setup
-    var table = new double[restrictii + 1][];
-    for (int i = 0; i <= restrictii; i++)
+    private void PerformTableTransformation(double[][] table, int columnIndexOfPivot, int rowIndexOfPivot, double[] xb)
     {
-        table[i] = new double[variabile + restrictii];
+        var pivotElement = table[rowIndexOfPivot][columnIndexOfPivot];
+        var pivotRow = table[rowIndexOfPivot];
+
+        // Divide pivot row by pivot element
+        xb[rowIndexOfPivot] /= pivotElement;
+        for (int i = 0; i < pivotRow.Length; i++)
+        {
+            pivotRow[i] /= pivotElement;
+        }
+        // Subtract pivot row from all other rows
+        for (int i = 0; i < table.Length; i++)
+        {
+            if (i == rowIndexOfPivot)
+                continue;
+            var row = table[i];
+            var rowMultiplier = row[columnIndexOfPivot];
+            for (int j = 0; j < row.Length; j++)
+            {
+                row[j] -= rowMultiplier * pivotRow[j];
+            }
+            xb[i] -= rowMultiplier * xb[rowIndexOfPivot];
+        }
+    }
+
+
+    private int FindEnteringColumn(double[] deltaJ)
+    {
+        Console.WriteLine(Array.IndexOf(deltaJ, deltaJ.Max()));
+        return Array.IndexOf(deltaJ, deltaJ.Max());
+    }
+
+    private int FindExitingColumn(double[] xb, double[][] table, int enteringColumn)
+    {
+        // we create a copy of the table array
+        var tableCopy = new double[table.Length][];
+        for (int i = 0; i < table.Length; i++)
+        {
+            tableCopy[i] = new double[table[i].Length];
+            for (int j = 0; j < table[i].Length; j++)
+            {
+                tableCopy[i][j] = table[i][j];
+            }
+        }
+        Console.WriteLine($"copy:{JsonSerializer.Serialize(tableCopy)}");
+        // we calculate the ratios
+        var ratios = new double[tableCopy.Length];
+        for (int i = 0; i < xb.Length; i++)
+        {
+            ratios[i] = xb[i] / tableCopy[i][enteringColumn];
+        }
+        Console.WriteLine($"ratios:{JsonSerializer.Serialize(ratios)}");
+
+        var indexOfMinRatio = Array.IndexOf(ratios, ratios.Min());
+
+        Console.WriteLine($"minRatio:{ratios[indexOfMinRatio]}");
+        Console.WriteLine($"minRatioIndex:{indexOfMinRatio}");
+        return indexOfMinRatio;
+    }
+
+    private bool IsOptimal(double[] deltaJ)
+    {
+        return deltaJ.All(d => d <= 0);
+    }
+
+    private double[] CalculateDeltaJ(double[] cbInit, double[] zj)
+    {
+        var deltaJ = new double[variabile + restrictii];
         for (int j = 0; j < variabile + restrictii; j++)
         {
-            if (i < restrictii && j < variabile)
-                table[i][j] = matrix[i][j];
-            else if (i < restrictii && j >= variabile && j < variabile + restrictii)
-                table[i][j] = (j - variabile == i) ? 1 : 0;
-            else if (i == restrictii && j < variabile)
-                table[i][j] = functionValues[j];
-            else if (i == restrictii && j >= variabile && j < variabile + restrictii)
-                table[i][j] = (j - variabile == i) ? 1 : 0;
+            deltaJ[j] = cbInit[j] - zj[j];
         }
+        Console.WriteLine("dj");
+        Console.WriteLine(JsonSerializer.Serialize(deltaJ));
+        return deltaJ;
     }
 
-    // Step 0: Calculate CB
-    var CbInitial = CalculateCB();
-        var coefBazeiIndex = new double[restrictii];
-for (int i = 0; i < restrictii; i++)
+    private double[] CalculateZj(double[][] table, double[] cb)
+    {
+        var zj = new double[variabile + restrictii];
+        for (int j = 0; j < variabile + restrictii; j++)
         {
-            coefBazeiIndex[i] = variabile + i;
+            for (int i = 0; i < restrictii; i++)
+            {
+                zj[j] += cb[i] * table[i][j];
+            }
         }
-
-    // Step 0: Calculate Zj
-    var zj = CalculateZj(table, CbInitial,coefBazeiIndex);
-
-    // Step 0: Calculate DeltaJ
-    var deltaJ = CalculateDeltaJ(CbInitial, zj, coefBazeiIndex);
-
-    // Step 0: Add initial step to the list
-    steps.Add(new SimplexStep
-    {
-        StepNumber = 0,
-        TableHeaders = GenerateTableHeaders(),
-        TableRows = GenerateTableRows(table),
-        DeltaJ = deltaJ.Select(d => d.ToString()).ToArray(),
-        CB = CbInitial.Select(c => c.ToString()).ToArray()
-    });
-
-    return steps;
-}
-
-private double[] CalculateCB()
-{
-    var cb = new double[variabile + restrictii];
-    for (int i = 0; i < variabile; i++)
-    {
-        cb[i] = functionValues[i];
+        return zj;
     }
-    for (int i = variabile; i < variabile + restrictii; i++)
-    {
-        cb[i] = 0;
-    }
-    Console.WriteLine("cb");
-    Console.WriteLine(JsonSerializer.Serialize(cb));
-    return cb;
-}
-
-private double[] CalculateZj(double[][] table, double[] cb,double[] indexOfBase)
-{
-    var zj = new double[variabile + restrictii];
-    for (int i = 0; i < variabile + restrictii; i++)
-    {
-        double sum = 0;
-        for (int j = 0; j < restrictii; j++)
-        {
-            if(indexOfBase.Contains(j)) sum += table[j][i] * cb[j];
-        }
-        zj[i] = sum;
-    }
-    Console.WriteLine("zj");
-    Console.WriteLine(JsonSerializer.Serialize(zj));
-    return zj;
-}
-
-    private double[] CalculateDeltaJ(double[] cb, double[] zj, double[] indexOfBase )
-{
-    var deltaJ = new double[variabile + restrictii];
-    for (int j = 0; j < variabile + restrictii; j++)
-    {
-        if(indexOfBase.Contains(j)) deltaJ[j] = 0;
-        else deltaJ[j] = cb[j] - zj[j];
-    }
-    Console.WriteLine("dj");
-    Console.WriteLine(JsonSerializer.Serialize(deltaJ));
-    return deltaJ;
-}
 
     private string[] GenerateTableHeaders()
     {
@@ -341,5 +462,9 @@ private double[] CalculateZj(double[][] table, double[] cb,double[] indexOfBase)
         public string[][] TableRows { get; set; }
         public string[] DeltaJ { get; set; }
         public string[] CB { get; set; }
+        public string[] ZJ { get; set; }
+        public string[] XB { get; set; }
+        public string[] Baza { get; set; }
+        public string PivotElement { get; set; }
     }
 }
