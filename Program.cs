@@ -1,4 +1,4 @@
-using BlazorApp_empty1;
+using Simplex;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
