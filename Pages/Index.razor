@@ -174,33 +174,14 @@
                             </tbody>
                         </table>
                         <br />
-                        @* <table> *@
-                        @*     <thead> *@
-                        @*     <th>@($"Z{step.StepNumber}")</th> *@
-                        @*         @for (int i = 0; i < step.DeltaJ.Length; i++) *@
-                        @*         { *@
-                        @*             var deltaJString = $"Δ{i + 1}"; *@
-                        @*         <th>@deltaJString</th> *@
-                        @*         } *@
-                        @*     </thead> *@
-                        @*     <tbody> *@
-                        @*         <tr> *@
-                        @*             <th>@step.ZK</th> *@
-                        @*             @foreach (var deltaJ in step.DeltaJ) *@
-                        @*             { *@
-                        @*                 <th>@deltaJ</th> *@
-                        @*             } *@
-                        @*         </tr> *@
-                        @*     </tbody> *@
-                        @* </table> *@
+                        
                         @if (step.Observatii.Count > 0)
                         {
-                            <ul>
-                                @foreach (var observatie in step.Observatii)
-                                {
-                                    <li>@observatie</li>
-                                }
-                            </ul>
+                            
+                            @foreach (var observatie in step.Observatii)
+                            {
+                                <p>@observatie</p>
+                            }
                         }
                     </div>
                     <hr />
